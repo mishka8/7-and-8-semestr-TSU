@@ -315,6 +315,8 @@ section .data
     a dd 0
     b dd 0
     c dd 0
+    space1 db 0
+    space2 db 0
     numbuf times 12 db 0
     errorMsg db "error", 10
     errorLen equ $ - errorMsg 
