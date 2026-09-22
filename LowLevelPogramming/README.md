@@ -1,6 +1,7 @@
 Низкоуровневое программирование на ассемблере NASM
 
 nasm -f elf64 fileName.asm -o 1.o
+
 ld 1.o -o program
 
 
