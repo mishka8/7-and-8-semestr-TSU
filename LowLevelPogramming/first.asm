@@ -320,3 +320,6 @@ section .data
     numbuf times 12 db 0
     errorMsg db "error", 10
     errorLen equ $ - errorMsg 
+
+;nasm -f elf64 fileName.asm -o 1.o
+;ld 1.o -o program
