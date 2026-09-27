@@ -5,8 +5,8 @@ _start:
 
 ; читаем пробелы первые и пропускаем их
 readASpaceSkip:
-    mov al, [symbol]
-    cmp al, '0'
+    mov al, [symbol] ;кладем в al то что лежит в по адресу символа
+    cmp al, '0' ;сравниваем 
     jb NotDigitA ;переход если меньше 
     cmp al, '9'
     ja NotDigitA ;переход если больше
@@ -29,7 +29,8 @@ readANext:
 
 ; читаем а
 readA:
-    movzx eax, byte [symbol] ;увеличиваем до 32 бит 
+    xor eax, eax ;обнуляем 
+    mov al, [symbol] ;кладем символ в al
     sub eax, '0' ;получаем число с помощью аски
     mov edx, [a] ;убираем значение а
     imul edx, edx, 10 ;умножаем на 10
@@ -86,7 +87,8 @@ readBNext:
 
 ;читаем б
 readB:
-    movzx eax, byte [symbol]
+    xor eax, eax ;обнуляем 
+    mov al, [symbol]
     sub eax, '0'
     mov edx, [b]
     imul edx, edx, 10
@@ -137,7 +139,8 @@ readCNext:
     jmp readCSpaceSkip
 
 readC:
-    movzx eax, byte [symbol]
+    xor eax, eax ;обнуляем 
+    mov al, [symbol]
     sub eax, '0'
     mov edx, [c]
     imul edx, edx, 10
@@ -320,6 +323,3 @@ section .data
     numbuf times 12 db 0
     errorMsg db "error", 10
     errorLen equ $ - errorMsg 
-
-;nasm -f elf64 fileName.asm -o 1.o
-;ld 1.o -o program
