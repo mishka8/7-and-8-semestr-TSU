@@ -14,6 +14,7 @@ section .text
 
 _start:
 
+;пропускаем пробелы
 readSpaceSkip:
     mov al, [symbol]
     cmp al, '0'
@@ -22,19 +23,21 @@ readSpaceSkip:
     ja  NotDigit
     jmp readNum
 
+;всё что не число
 NotDigit:
     cmp al, ' '
     je  readNext
     cmp al, 10
     je  readNext
-    cmp al, 13
-    je  readNext
     jmp error
 
+;чтение следующего
 readNext:
-    call readChar
+    call readChar;работает как вызов функции
     jmp readSpaceSkip
+    ;берем дарес следующей инструкции кладем в стек и возвращаемся в неё после ret кладем в стек 
 
+;читаем и проверяем число
 readNum:
     ;первая цифра трёхзначного числа не может быть 0
     cmp al, '0'
@@ -76,16 +79,14 @@ readNum:
     mov [a], edx
     call readChar
 
-; ============ после третьей цифры цифра быть не должна ============
+;проверка что число трехзначное если есть четвертая цифра - ошибка
     cmp al, '0'
     jb  numFlip
     cmp al, '9'
     ja  numFlip
     jmp error
 
-
-
-
+;перестановка цифр
 numFlip:
     ; результат = (a % 10)*100 + (a / 10)
     mov eax, [a]
@@ -96,12 +97,14 @@ numFlip:
     add eax, edx
     mov [a], eax 
 
+;вывод
 output:
     mov eax, [a]
     mov edi, numbuf+11
     mov byte [edi], 0
     mov ebx, 10
     xor ecx, ecx
+;перевод числа в строку 
 convA:
     xor edx, edx
     div ebx
@@ -118,7 +121,7 @@ convA:
     mov ecx, edi
     int 0x80
 
-    ; перевод строки
+    ;перевод строки
     mov eax, 4
     mov ebx, 1
     mov ecx, endStr
@@ -126,21 +129,24 @@ convA:
     int 0x80
     jmp exit
 
-
+;читаем символ
 readChar:
     mov eax, 3
     mov ebx, 0
     mov ecx, symbol
     mov edx, 1
     int 0x80
+    ;читаем один символ потом проверяем что прочли один символ если все хорошо прыгаем на .ok
+    ;и кладем либо ноль в случае неправильного чтения символа или кладем символ
+
     cmp eax, 1
     je  .ok
     mov byte [symbol], 0
 .ok:
     mov al, [symbol]
-    ret
+    ret;возврат где мы вызывали
 
-
+;ошибка
 error:
     mov eax, 4
     mov ebx, 1
@@ -149,12 +155,11 @@ error:
     int 0x80
     jmp exit
 
-
+;выход
 exit:
     mov eax, 1
     xor ebx, ebx
     int 0x80
-
 
 section .data
     symbol db ' '
@@ -162,5 +167,4 @@ section .data
     numbuf times 12 db 0
     endStr db 10
     errorMsg db "error", 10
-    errorLen equ $ - errorMsg 
-
+    errorLen equ $ - errorMsg
