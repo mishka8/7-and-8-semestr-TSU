@@ -184,16 +184,6 @@ void first_lab()
     full_trial_divisor_method(numbers);
 }
 
-
-//метод факторизации спец назначения т.к. находит только большие делители 
-//идея метода состоит в угадывании след значения на основе прошлых и корректировке в некоторых случаях
-//всего выполняется два раза деление вначале
-//если делители достаточно велики то количество операций будет небольшим
-//n = d[k] * q[k] + r[k]
-//тогда последовательность неполных частных q будет образовывать или весли себя почти как ариф прогрессия
-//а r[k] имееет квадратичное поведение
-//значит мы можем предсказывать след значения
-
 BN newtonRoot(const BN& num, unsigned int degree)//корень n-ой степени с помощью метода ньютона
 {
     BN zero = Uint64MakeBN(0);
@@ -231,6 +221,14 @@ BN findDToOlweyMethod(BN n)//находим д с чего начинать бу
     return two * newtonRoot(num_copy, 3) + one;
 }
 
+//метод факторизации спец назначения т.к. находит только большие делители 
+//идея метода состоит в угадывании след значения на основе прошлых и корректировке в некоторых случаях
+//всего выполняется два раза деление вначале
+//если делители достаточно велики то количество операций будет небольшим
+//n = d[k] * q[k] + r[k]
+//тогда последовательность неполных частных q будет образовывать или весли себя почти как ариф прогрессия
+//а r[k] имееет квадратичное поведение
+//значит мы можем предсказывать след значения
 BN olwey_method(const BN& num, BN d)
 {
     BN zero = Uint64MakeBN(0);
@@ -349,6 +347,78 @@ void second_lab()
     full_olwey_method(numbers);
 }
 
+vector<BN> method_ferma(const BN& n)
+{
+    BN zero = Uint64MakeBN(0);
+    BN one = Uint64MakeBN(1);
+    BN two = Uint64MakeBN(2);
+    BN num = n;
+    vector<BN> d(2);
+
+    if(num % 2 == 0 || n <= one)
+    {
+        cout << "num not correct" << endl;
+        d[0] = 1; d[1] = 1;
+        return d;
+    }
+
+    BN t = Uint64MakeBN(5);
+    if(num.MilRabTest(t))//првоерка на пустоту 
+    {
+        cout << "prost" << endl;
+        d[0] = 1; d[1] = n;
+        return d;
+    }
+
+    BN x = newtonRoot(n, 2);
+    if (x.qsqr() == n)//полный квадрат
+    {
+        d[0] = x;
+        d[1] = x;
+        return d;
+    }
+    
+    BN end_while = (num + one) / two;
+    BN z = x.qsqr() - num;
+
+
+    while(x <= end_while)
+    {
+        x += one;
+
+        if(x == end_while)
+        {
+            cout << "x - prostoe" << endl;
+            d[0] = 1; d[1] = num;
+            return d;
+        }
+
+        z = z + two * x - one;
+        BN y = newtonRoot(z, 2);
+
+        if(y.qsqr() == z)
+        {
+            d[0] = x + y; d[1] = x - y;
+            return d;
+        }
+    }
+
+    d[0] = 1; d[1] = num;
+    return d;    
+}
+
+void full_method_ferma(BN num)
+{
+    vector<BN> delitel = method_ferma(num);
+    cout << "num - " << num << endl;
+    for(int i = 0; i < delitel.size(); i++)
+    {
+        cout << "del - " << delitel[i] << endl;
+    }
+}
+
+
+
 int main()
 {
     //first_lab();
@@ -359,8 +429,13 @@ int main()
     //cout << newtonRoot(Uint64MakeBN(252109), 2) << endl;  // должно быть 502
     //cout << findDToOlweyMethod(Uint64MakeBN(252109)) << endl;
 
+    //third lab
+    // BN test_num;
+    // test_num.decIn("9189001");
+    // full_method_ferma(test_num);
 
     return 0;
+
 }
 
 //252109
