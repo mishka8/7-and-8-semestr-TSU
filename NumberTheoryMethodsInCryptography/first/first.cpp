@@ -1,7 +1,5 @@
-#include <codecvt>
-#include <stdexcept>
-#include <string>
 #include "BigNumbers.h"
+
 
 using namespace std;
 //метод пробных делителей
@@ -157,11 +155,7 @@ void full_trial_divisor_method(vector<BN> test)
     }
 }
 
-
-
-
-
-int main()
+void first_lab()
 {
     // 435461 - 13 * 19 * 41 * 43
     // 3483688 - 2^3 * 13 * 19 * 41 * 43
@@ -183,7 +177,178 @@ int main()
     num_test.decIn("3471234723723487");
     numbers.push_back(num_test);
 
+    num_test.decIn("34717");
+    numbers.push_back(num_test);
+
+
     full_trial_divisor_method(numbers);
+}
+
+BN newtonRoot(const BN& num, unsigned int degree)
+{
+    BN zero = Uint64MakeBN(0);
+    BN one = Uint64MakeBN(1);
+    BN two = Uint64MakeBN(2);
+
+    if (num <= zero) return zero;
+    if (num == one) return one;
+    if (degree == 0) return one;
+    if (degree == 1) return num;
+
+    BN num_copy = num;
+    BN prew = num;
+    BN n1 = Uint64MakeBN(degree - 1);
+    BN n  = Uint64MakeBN(degree);
+
+    while (true)
+    {
+        BN prewPow = prew ^ n1;
+        BN tmp = num_copy / prewPow;
+        BN next = (n1 * prew + tmp) / n;
+
+        if (next == prew) return next;
+        if (next > prew) return prew;
+
+        prew = next;
+    }
+}
+
+BN findDToOlweyMethod(BN n) 
+{
+    BN num_copy = n;
+    BN two = Uint64MakeBN(2);
+    BN one = Uint64MakeBN(1);
+    return two * newtonRoot(num_copy, 3) + one;
+}
+
+BN olwey_method(const BN& num, BN d)
+{
+    BN zero = Uint64MakeBN(0);
+    BN one = Uint64MakeBN(1);
+    BN two = Uint64MakeBN(2);
+    BN four = Uint64MakeBN(4);
     
+    BN num_copy = num;
+
+    BN p = Uint64MakeBN(1);
+
+    if (num_copy % two == zero || num <= one)
+    {
+        cout << "Нужно не четное число, больше единицы" << endl;
+        return p;
+    }
+
+    BN t_rab = Uint64MakeBN(8);
+    if (num_copy.MilRabTest(t_rab))
+    {
+        cout << "Простое" << endl;
+        return p;
+    }
+
+    BN s = newtonRoot(num_copy, 2);
+
+    if (d < (two * newtonRoot(num_copy, 3) + one) || d > s || d % two == zero)
+    {
+        cout << "не подходит по условиям, должно быть нечетным, больше чем s, подходить под формулу" << endl;
+        return p;
+    }
+
+    BN r = num_copy % d;
+    BN r_prev = num_copy % (d - two);
+    BN q = four * ((num_copy / (d - two)) - (num_copy / d));
+
+    while (d <= s)
+    {
+        d += two;
+        
+        if (d > s) 
+        {
+            cout << "число - " << num << " не имеет делителей в диапозоне - [ " << d - two << ", " << s << " ]" << endl;
+            break;
+        }
+
+        BN r_new = two * r - r_prev + q;
+        r_prev = r; 
+        r = r_new;
+
+        if (r < zero) 
+        { 
+            r += d; 
+            q += four; 
+        }
+
+        while (r >= d) 
+        { 
+            r -= d;
+            q -= four; 
+        }
+
+        if (r == zero) 
+        { 
+            p = d; 
+            break;
+        }
+    }
+
+    return p;
+}
+
+void full_olwey_method(vector<BN> test)
+{   
+    BN one = Uint64MakeBN(1);
+    for(int i = 0; i < test.size(); i++)
+    {
+        BN n = test[i];
+
+        BN d = findDToOlweyMethod(n);
+        BN res = olwey_method(n, d);
+
+        if (res == one)
+        {
+            continue;
+        }
+        else 
+        {
+            cout << "число " << n << " - найден делитель " << res << endl;
+        }
+    }
+}
+
+void second_lab()
+{
+    vector<BN> numbers;
+
+    numbers.push_back(Uint64MakeBN(252109));//143
+    numbers.push_back(Uint64MakeBN(128333));//нет корня 
+    numbers.push_back(Uint64MakeBN(820621));//нет корня
+    numbers.push_back(Uint64MakeBN(7737509));//923
+    numbers.push_back(Uint64MakeBN(67435217));//7549
+    numbers.push_back(Uint64MakeBN(29202331261007));//1078639
+    numbers.push_back(Uint64MakeBN(4594246750342037099));//3997417
+
+    BN num_test;
+    num_test.decIn("140774569922349479203");//11650417
+    numbers.push_back(num_test);
+
+    // num_test.decIn("3471234723723487");
+    // numbers.push_back(num_test);
+
+    // num_test.decIn("34717");
+    // numbers.push_back(num_test);
+
+    full_olwey_method(numbers);
+}
+
+int main()
+{
+    //first_lab();
+
+    second_lab();
+
+    //cout << newtonRoot(Uint64MakeBN(252109), 3) << endl;  // должно быть 63
+    //cout << newtonRoot(Uint64MakeBN(252109), 2) << endl;  // должно быть 502
+    //cout << findDToOlweyMethod(Uint64MakeBN(252109)) << endl;
+
+
     return 0;
 }
