@@ -184,6 +184,7 @@ void first_lab()
     full_trial_divisor_method(numbers);
 }
 
+
 BN newtonRoot(const BN& num, unsigned int degree)//корень n-ой степени с помощью метода ньютона
 {
     BN zero = Uint64MakeBN(0);
@@ -202,9 +203,9 @@ BN newtonRoot(const BN& num, unsigned int degree)//корень n-ой степ�
 
     while (true)
     {
-        BN prewPow = prew ^ n1;
-        BN tmp = num_copy / prewPow;
-        BN next = (n1 * prew + tmp) / n;
+        BN prewPow = prew ^ n1;// x_i^(k-1)
+        BN tmp = num_copy / prewPow;// N / x_i^(k-1)
+        BN next = (n1 * prew + tmp) / n;// ((k-1)*x_i + N/x_i^(k-1)) / k
 
         if (next == prew) return next;
         if (next > prew) return prew;
@@ -347,6 +348,13 @@ void second_lab()
     full_olwey_method(numbers);
 }
 
+//поиск ближайших к корню n делителей числа n   
+//идея в представлении факторизируемового числа в виде разности двух квадраьтов
+//алгоритм состоит в опробовании всех x от n^1/2 до (n + 1) / 2
+//вычесляем третий шаг без возведения в квадрат 
+//метод ферма эффективен когда делители числа близки к n^1/2
+//для чисел с маленькими делителями он работает медленно 
+
 vector<BN> method_ferma(const BN& n)
 {
     BN zero = Uint64MakeBN(0);
@@ -355,7 +363,7 @@ vector<BN> method_ferma(const BN& n)
     BN num = n;
     vector<BN> d(2);
 
-    if(num % 2 == 0 || n <= one)
+    if(num % 2 == 0 || n <= one)//ошибочные случаи
     {
         cout << "num not correct" << endl;
         d[0] = 1; d[1] = 1;
@@ -371,20 +379,19 @@ vector<BN> method_ferma(const BN& n)
     }
 
     BN x = newtonRoot(n, 2);
-    if (x.qsqr() == n)//полный квадрат
+    if (x.qsqr() == n)//полный квадрат a = b = n^1/2 = x
     {
         d[0] = x;
         d[1] = x;
         return d;
     }
     
-    BN end_while = (num + one) / two;
-    BN z = x.qsqr() - num;
-
+    BN end_while = (num + one) / two;//условие выхода 
+    BN z = x.qsqr() - num;//начальное z
 
     while(x <= end_while)
     {
-        x += one;
+        x += one;//каждый раз прибавляем единицу
 
         if(x == end_while)
         {
@@ -404,7 +411,7 @@ vector<BN> method_ferma(const BN& n)
     }
 
     d[0] = 1; d[1] = num;
-    return d;    
+    return d;       
 }
 
 void full_method_ferma(BN num)
@@ -417,22 +424,23 @@ void full_method_ferma(BN num)
     }
 }
 
-
+void third_lab(BN num)
+{
+    full_method_ferma(num);
+}
 
 int main()
 {
     //first_lab();
 
-    second_lab();
+    //second_lab();
 
-    //cout << newtonRoot(Uint64MakeBN(252109), 3) << endl;  // должно быть 63
-    //cout << newtonRoot(Uint64MakeBN(252109), 2) << endl;  // должно быть 502
-    //cout << findDToOlweyMethod(Uint64MakeBN(252109)) << endl;
 
-    //third lab
-    // BN test_num;
-    // test_num.decIn("9189001");
-    // full_method_ferma(test_num);
+    BN test_num;
+    //test_num.decIn("88169891");
+    test_num.decIn("256590620791");
+    third_lab(test_num);
+    
 
     return 0;
 
@@ -455,7 +463,6 @@ int main()
 //r = 43
 //d = 129//т.к. +=2
 //q = 124
-
 
 
 //d = 143
