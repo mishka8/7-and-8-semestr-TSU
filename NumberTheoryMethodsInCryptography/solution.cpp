@@ -512,6 +512,107 @@ void fourth_lab_P0()
 
 }
 
+BN method_P1_polard(const BN& n)
+{
+    BN zero = Uint64MakeBN(0), one = Uint64MakeBN(1), two = Uint64MakeBN(2);
+    BN num = n;
+    
+    if(num <= one)
+    {
+        cout << "num not correct" << endl;
+        return one;
+    }
+    if(num % two == zero)
+        return two;
+
+    BN t = Uint64MakeBN(8);
+    if(num.MilRabTest(t))
+    {
+        cout << "prostoe" << endl;
+        return one;
+    }
+    
+    
+    
+    int maxTry = 30;
+    for(int trye = 0; trye < maxTry; trye++)
+    {
+        BN B = newtonRoot(num, 2);//выбираем из условия
+        
+        BN maxA = num - two;
+        BN a, d; a.randomizeRange(two, maxA);
+        
+        d = a.gcd(num);
+        
+        cout << num << " " << a << " "<< a.gcd(num) << endl;
+        if((d > 1) && (d < num))
+        {
+            cout << "aaaaaaaaaaaaa" << endl;
+            return d;
+        }
+
+        BN q = two;
+        bool flag = true;
+
+        while(q < B)
+        {
+            if((q != two) && (!q.MilRabTest(t)))
+            {
+                q+= one;
+                continue;
+            }
+            BN e = num.log(q);
+            BN qe = q ^ e;
+
+            if (e == zero)
+            {
+                q += one;
+                continue;
+            }
+
+            while (qe > num && e > zero)
+            {
+                e -= one;
+                qe = q ^ e;
+            }
+
+            a = a.powmod(qe, num);//(a ^ (q^e)) mod n
+
+            if(a == one)
+            {
+                flag = false;
+                //cout << "некатострофа пробуем другое a" << endl;
+                //break;
+            }
+            
+            d = (a - one).gcd(num);
+
+            if(d > 1 && d < num)
+            {
+                cout << "we tyt" << endl;
+                return d;
+            }
+            
+            if(d == num)
+            {
+                //cout << "некатострофа пробуем другое a" << endl;
+                flag = false;
+                //break;
+            }
+            
+            q += one;
+
+            
+            cout << "1" << endl;
+        }
+
+        if(!flag)
+        {
+            continue;
+        }
+    }
+    return one;
+}
 
 
 int main()
@@ -522,7 +623,11 @@ int main()
 
     // third_lab();
 
-    fourth_lab_P0();
+    //fourth_lab_P0();
+
+    BN num_test;
+    num_test = Uint64MakeBN(533);
+    cout << method_P1_polard(num_test) << endl;
     
     return 0;
 }
