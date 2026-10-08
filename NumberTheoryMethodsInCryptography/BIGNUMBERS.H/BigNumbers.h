@@ -112,6 +112,7 @@ public:
     set<BN> factorize();
 
     BN gcd(const BN& n) const;//НОД - greatest common divisor
+    BN log(BN base) const;
 };
 
 #endif
