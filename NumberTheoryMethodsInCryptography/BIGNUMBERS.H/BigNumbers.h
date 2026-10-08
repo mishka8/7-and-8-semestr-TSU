@@ -18,6 +18,9 @@ typedef unsigned int DBASE;
 typedef unsigned long long int QBASE;
 #define BASE_SIZE (sizeof(BASE) * 8)
 
+//добавить функции корня 
+//добавить деление по модулю
+
 // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ:
 // Мы говорим компилятору "они существуют, но не здесь". 
 // Память под них выделится в .cpp файле.
@@ -107,6 +110,8 @@ public:
     bool signGet();
     //факторизация возвращает множество простых делителей 
     set<BN> factorize();
+
+    BN gcd(const BN& n) const;//НОД - greatest common divisor
 };
 
 #endif
