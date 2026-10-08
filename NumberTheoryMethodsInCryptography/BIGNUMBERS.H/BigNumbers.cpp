@@ -1,4 +1,5 @@
 #include "BigNumbers.h"
+#include <string>
 
 random_device rd;
 mt19937 gen(static_cast<unsigned>(
@@ -10,6 +11,7 @@ void BN::signSet (const bool & newSign)
 {
     sign = newSign;
 }
+
 bool BN::signGet()
 {
     return sign;
@@ -1265,4 +1267,34 @@ BN BN::gcd(const BN& n) const
     }   
     
     return a;
+}
+
+BN BN::log(BN base) const
+{
+    BN zero; zero.decIn("0");
+    BN one; one.decIn("1");
+
+    BN x = *this;
+    if(x <= one) { cout << "error log" << endl; return zero;}
+    if(base <= one) { cout << "error log" << endl; return zero;}
+    if(x < base) { cout << "error log" << endl; return zero;}
+
+    QBASE low = 1;
+    QBASE high = (QBASE)x.length() * BASE_SIZE;
+
+    while(low < high)
+    {
+        QBASE mid = low + (high - low + 1) / 2;
+        BN midBN; midBN.decIn(to_string(mid));
+        BN pw = base ^ mid;
+
+        if(pw <= x)
+            low = mid;
+        else
+            high = mid - 1;
+
+    }
+    BN res; res.decIn(to_string(low));
+
+    return res;
 }
