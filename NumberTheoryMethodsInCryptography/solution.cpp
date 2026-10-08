@@ -184,7 +184,7 @@ void first_lab()
     full_trial_divisor_method(numbers);
 }
 
-
+/////////////////////////third lab
 BN newtonRoot(const BN& num, unsigned int degree)//корень n-ой степени с помощью метода ньютона
 {
     BN zero = Uint64MakeBN(0);
@@ -221,6 +221,7 @@ BN findDToOlweyMethod(BN n)//находим д с чего начинать бу
     BN one = Uint64MakeBN(1);
     return two * newtonRoot(num_copy, 3) + one;
 }
+
 
 //метод факторизации спец назначения т.к. находит только большие делители 
 //идея метода состоит в угадывании след значения на основе прошлых и корректировке в некоторых случаях
@@ -428,6 +429,81 @@ void third_lab(BN num)
 {
     full_method_ferma(num);
 }
+////////////////////////
+//полард - вероятностный типа лас вегас иногда не возвращает результат
+//метод основывается на свойствах отображений конечного множества в себя
+
+BN f_help_method(BN x, BN c, BN n)
+{
+    BN res;
+
+    res = (x.qsqr() + c) % n;
+    return res;
+}
+
+BN method_P0_polard(const BN& n)
+{
+    BN num = n;
+    BN two = Uint64MakeBN(2);
+    BN d = Uint64MakeBN(1);
+    if(num <= 1)
+    {
+        cout << "num not correct" << endl;
+        return d;
+    }
+    if(num % 2 == 0)
+        return two;
+
+    BN test = Uint64MakeBN(5);
+    if(num.MilRabTest(test))
+    {
+        cout << "prostoe" << endl;
+        return d;
+    }
+
+    // BN a = two, b = two;
+    BN one = Uint64MakeBN(1), zero = Uint64MakeBN(0);
+    BN c = one, lim_for_c = Uint64MakeBN(10);
+
+    // a = f_help_method(a, c, num);
+    // b = f_help_method(f_help_method(b, c, num), c, num);
+
+    while(c <= lim_for_c)
+    {
+        BN a, b;
+
+        a = two;
+        b = two;
+        do
+        {
+            a = f_help_method(a, c, num);
+            b = f_help_method(f_help_method(b, c, num), c, num);
+            cout << a << " " << b << endl;
+
+            if(a > b)
+            {
+                d = num.gcd(a - b);
+            }
+            if(b > a)
+            {
+                d = num.gcd(b - a);
+            }
+            if(d != num && d != one)
+                return d;            
+        } while(a != b);
+        c += 1;        
+    }
+    cout << "net delitelei" << endl;
+    return d;
+}
+
+void fourth_lab()
+{
+
+
+}
+
+
 
 int main()
 {
@@ -436,12 +512,16 @@ int main()
     //second_lab();
 
 
-    BN test_num;
-    //test_num.decIn("88169891");
-    test_num.decIn("256590620791");
-    third_lab(test_num);
-    
+    // BN test_num;
+    // //test_num.decIn("88169891");
+    // test_num.decIn("256590620791");
+    // third_lab(test_num);
 
+    //fourth_lab();
+    
+    BN num_test;
+    num_test = Uint64MakeBN(533);
+    cout << method_P0_polard(num_test) << endl;
     return 0;
 
 }
