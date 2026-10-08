@@ -425,9 +425,12 @@ void full_method_ferma(BN num)
     }
 }
 
-void third_lab(BN num)
+void third_lab()
 {
-    full_method_ferma(num);
+    BN test_num;
+    //test_num.decIn("88169891");
+    test_num.decIn("256590620791");
+    full_method_ferma(test_num);
 }
 ////////////////////////
 //полард - вероятностный типа лас вегас иногда не возвращает результат
@@ -478,7 +481,7 @@ BN method_P0_polard(const BN& n)
         {
             a = f_help_method(a, c, num);
             b = f_help_method(f_help_method(b, c, num), c, num);
-            cout << a << " " << b << endl;
+            //cout << a << " " << b << endl;
 
             if(a > b)
             {
@@ -497,9 +500,15 @@ BN method_P0_polard(const BN& n)
     return d;
 }
 
-void fourth_lab()
+void fourth_lab_P0()
 {
+    BN num_test;
+    num_test = Uint64MakeBN(55);
+    cout << "num - " << num_test << " delitel - "<< method_P0_polard(num_test) << endl;
 
+    BN num_test_1;
+    num_test_1 = Uint64MakeBN(533);
+    cout << "num - " << num_test_1 << " delitel - "<< method_P0_polard(num_test_1) << endl;
 
 }
 
@@ -511,41 +520,9 @@ int main()
 
     //second_lab();
 
+    // third_lab();
 
-    // BN test_num;
-    // //test_num.decIn("88169891");
-    // test_num.decIn("256590620791");
-    // third_lab(test_num);
-
-    //fourth_lab();
+    fourth_lab_P0();
     
-    BN num_test;
-    num_test = Uint64MakeBN(533);
-    cout << method_P0_polard(num_test) << endl;
     return 0;
-
 }
-
-//252109
-//d = 63
-//s = 502
-//d = 2 * 63 + 1 = 127
-
-//r1 = 252109 mod 127 = 14 //1985
-//r2 = 252109 mod (127 - 2) = 109 //2016
-
-//q = 4 * (2016 - 1985) = 4 * 31 = 124
-//первый шаг
-
-//цикл
-//r_new = 2 * 14 - 109 + 124 = 43
-//r_prew = r = 14
-//r = 43
-//d = 129//т.к. +=2
-//q = 124
-
-
-//d = 143
-// r_new = 0
-//r_prew = 1
-//r = 0
