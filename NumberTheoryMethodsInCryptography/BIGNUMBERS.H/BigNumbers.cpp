@@ -1249,3 +1249,20 @@ void BN::randomize(const int & length)
     }
 }
 
+//алгоритм евклида a b a%b -> 48 18 12 -> 18 12 6 -> 12 6 0 
+//-> 6 0 и тут выход так как b = 0
+BN BN::gcd(const BN& n) const
+{
+    BN a = *this;
+    BN b = n;
+    BN zero; zero.decIn("0");
+
+    while(b != zero)
+    {
+        BN tmp = b;
+        b = a % b;
+        a = tmp;
+    }   
+    
+    return a;
+}
