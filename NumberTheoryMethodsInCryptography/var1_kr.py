@@ -27,7 +27,7 @@ def pairs_dixon(n, limit=3000):
         yield a % n, a * a % n          # b = a^2 mod n
 
 
-def dixon_system(n, base, limit=3000):
+def dixon_system(n, base, limit=3000, max_print=10):
     """Метод Диксона: вернуть список гладких пар (a, b, e) и матрицу над GF(2)."""
     rel = []          # (a, b, показатели)
     rows = []         # строки матрицы V по модулю 2 (списки 0/1)
@@ -38,7 +38,10 @@ def dixon_system(n, base, limit=3000):
         rel.append((a, b, e))
         vec = [x % 2 for x in e]
         rows.append(vec)
-        print(f"  a = {a:6}  b = {b:8}  показатели {e}  mod 2 {vec}")
+        if len(rel) <= max_print:
+            print(f"  a = {a:6}  b = {b:8}  показатели {e}  mod 2 {vec}")
+    if len(rel) > max_print:
+        print(f"  ... (всего гладких пар: {len(rel)}, показаны первые {max_print})")
     return rel, rows
 
 
@@ -68,14 +71,18 @@ if __name__ == "__main__":
     # пример: n = 2599, база S = {2, 3, 5, 7}
     n = 2599
     base = [2, 3, 5, 7]
-    MAX_DEPS = 10          # <-- ограничение на число выводимых зависимостей можно выводить больше
+    MAX_DEPS = 10          # ограничение на число выводимых зависимостей
+    MAX_MATRIX_ROWS = 5    # ограничение на число печатаемых строк матрицы
+    MAX_PAIRS = 10         # ограничение на число печатаемых гладких пар
 
     print(f"n = {n}, база S = {base}, k = {len(base)}\n")
-    print("Гладкие пары (метод Диксона):")
-    rel, rows = dixon_system(n, base)
+    print(f"Гладкие пары (метод Диксона, первые {MAX_PAIRS}):")
+    rel, rows = dixon_system(n, base, max_print=MAX_PAIRS)
 
-    print("\nМатрица над GF(2) (строки — пары, столбцы — элементы базы):")
-    for r in rows:
+    # матрицу в консоль печатаем только частично
+    print(f"\nМатрица над GF(2) (первые {MAX_MATRIX_ROWS} из {len(rows)} строк; "
+          f"столбцы — элементы базы):")
+    for r in rows[:MAX_MATRIX_ROWS]:
         print("  ", r)
 
     # битовые маски строк для null_space
