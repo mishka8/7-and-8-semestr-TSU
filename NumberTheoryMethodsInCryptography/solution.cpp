@@ -1,6 +1,5 @@
 #include "BigNumbers.h"
 
-
 using namespace std;
 //метод пробных делителей
 //факторизация - разложение натурального числа на простые сомножители
@@ -435,7 +434,14 @@ void third_lab()
 ////////////////////////
 //полард - вероятностный типа лас вегас иногда не возвращает результат
 //метод основывается на свойствах отображений конечного множества в себя
+//метод специального назначения - хорошо ищет маленькие делители 
+//вероятность успеха тем выше, чем меньше d
+//критерия выбора функции нет но эмперическим путем установлено 
+//f(x^2 + c)
+//вычисляется до тех пор пока не произойдет совпадение a == b(в файле xi == x2i)
+//совпадение будет точно так как переодичность x
 
+//вспомогательная (x^2 + c) % n (c - оптимизация чтобы возвращатьсяя во второй пункт)
 BN f_help_method(BN x, BN c, BN n)
 {
     BN res;
@@ -464,17 +470,14 @@ BN method_P0_polard(const BN& n)
         return d;
     }
 
-    // BN a = two, b = two;
     BN one = Uint64MakeBN(1), zero = Uint64MakeBN(0);
-    BN c = one, lim_for_c = Uint64MakeBN(10);
+    BN c = one, lim_for_c = Uint64MakeBN(20);//c - будет переодическим так как +=1 каждый раз до лимита
 
-    // a = f_help_method(a, c, num);
-    // b = f_help_method(f_help_method(b, c, num), c, num);
-
-    while(c <= lim_for_c)
+    while(c <= lim_for_c)//из замечаний для улучшения метода 
     {
         BN a, b;
-
+        //сделаем do while так как в первом пункте a = b = two и у нас в цикле проверка если a == b -> выход
+        //не вычисляем во внешнем цикле чтобы не нагружать память
         a = two;
         b = two;
         do
@@ -483,16 +486,16 @@ BN method_P0_polard(const BN& n)
             b = f_help_method(f_help_method(b, c, num), c, num);
             //cout << a << " " << b << endl;
 
-            if(a > b)
+            if(a > b)//формальная реализация |a - b| просто смотрим что больше
             {
-                d = num.gcd(a - b);
+                d = num.gcd(a - b);//gcd это НОД по алгоритму евклида в BigNumbers описано как работает
             }
             if(b > a)
             {
                 d = num.gcd(b - a);
             }
-            if(d != num && d != one)
-                return d;            
+
+            if(d != num && d != one) { return d; }
         } while(a != b);
         c += 1;        
     }
@@ -503,14 +506,29 @@ BN method_P0_polard(const BN& n)
 void fourth_lab_P0()
 {
     BN num_test;
-    num_test = Uint64MakeBN(55);
+    num_test = Uint64MakeBN(19825);
     cout << "num - " << num_test << " delitel - "<< method_P0_polard(num_test) << endl;
 
     BN num_test_1;
-    num_test_1 = Uint64MakeBN(533);
+    num_test_1 = Uint64MakeBN(1232854618375623997);
     cout << "num - " << num_test_1 << " delitel - "<< method_P0_polard(num_test_1) << endl;
 
 }
+
+//как и p0-полард так же метод спец назначения и так же является вероятностным
+//метод очень быстро находит простые делители малой и средней величины
+//n - B - гладкое, если все его простые делители не превосходят B
+//по сути можно реализовывать с помощью функции factorize() она возвращает множество простых делителилей
+//но у меня сделано подругому
+//метод поларда позволяет исходя из границы гладкости B найти делитель d такой что 
+//d-1 - B-гладкое
+//так как у меня реализован корень с помощью метода ньютона  я испоьлзую B  (=/<=) n^(1/2)(корень)
+//для противостояния метода все простые делители p факторизируемого числа должны быть такими,
+//чтобы p-1 не являлось B-гладким
+//метод поларда - аналог метода пробных делителей
+//только мы ищем перебором не делители числа n, а делители d-1
+//на практике используют используют до применения сильных методов факторизации,
+//чтобы отделить небольшие простые делители 
 
 BN method_P1_polard(const BN& n)
 {
@@ -531,89 +549,312 @@ BN method_P1_polard(const BN& n)
         cout << "prostoe" << endl;
         return one;
     }
-    
-    
-    
-    int maxTry = 30;
-    for(int trye = 0; trye < maxTry; trye++)
+    //берем 10 попыток так как отказы имеют разную природу 
+    //и в п 3.3 отказ не критичен и мы можем вернуться в пункт 2 и взять дургое a
+    int maxTry = 10;
+
+    BN B = newtonRoot(num, 2);//выбираем из условия
+    for (int attempt = 0; attempt < maxTry; ++attempt)
     {
-        BN B = newtonRoot(num, 2);//выбираем из условия
-        
-        BN maxA = num - two;
-        BN a, d; a.randomizeRange(two, maxA);
-        
+        BN a, d;
+        a.randomizeRange(two, num - two);
+
         d = a.gcd(num);
-        
-        cout << num << " " << a << " "<< a.gcd(num) << endl;
-        if((d > 1) && (d < num))
-        {
-            cout << "aaaaaaaaaaaaa" << endl;
+
+        //сразу проверяем делитель если не 1 то выходим
+        if (d > one && d < num)
             return d;
-        }
 
-        BN q = two;
-        bool flag = true;
-
-        while(q < B)
+        for (BN q = two; q <= B; q += one)//перебираем все простые q до B
         {
-            if((q != two) && (!q.MilRabTest(t)))
-            {
-                q+= one;
-                continue;
-            }
+            //проверяем q что оно простое
+            if (q != two && !q.MilRabTest(t)) { continue; }
+
+            // BN e = B.log(q);
             BN e = num.log(q);
+
+            if (e == zero) { continue; }
+
             BN qe = q ^ e;
 
-            if (e == zero)
-            {
-                q += one;
-                continue;
-            }
+            //возведение в степень по модулю a^(q^e) mod n
+            a = a.powmod(qe, num);
+            if(a == one) { break; }
 
-            while (qe > num && e > zero)
-            {
-                e -= one;
-                qe = q ^ e;
-            }
-
-            a = a.powmod(qe, num);//(a ^ (q^e)) mod n
-
-            if(a == one)
-            {
-                flag = false;
-                //cout << "некатострофа пробуем другое a" << endl;
-                //break;
-            }
-            
+            //считаем d по формуле
             d = (a - one).gcd(num);
 
-            if(d > 1 && d < num)
-            {
-                cout << "we tyt" << endl;
+            //если d меньше числа и больше единицы - значит нашли делитель
+            if (d > one && d < num)
                 return d;
-            }
-            
-            if(d == num)
-            {
-                //cout << "некатострофа пробуем другое a" << endl;
-                flag = false;
-                //break;
-            }
-            
-            q += one;
 
-            
-            cout << "1" << endl;
-        }
-
-        if(!flag)
-        {
-            continue;
+            //если d == num значит нет делителей и a выбрано плохое а 
+            //выходим и меняем a
+            //if (d == num) { break; }
         }
     }
+    //сюда попадаем после 10 попыток и возвращаем 1 как отказ
+    cout << "not find" << endl;
     return one;
 }
 
+void fourth_lab_P1()
+{
+    BN test1; test1 = Uint64MakeBN(19825);
+    BN test2; test2 = Uint64MakeBN(1232854618375623997);
+    BN res1 = method_P1_polard(test1);
+    BN res2 = method_P1_polard(test2);
+
+    cout << "num - " << test1 << " delitel - "<< res1 << endl;
+    cout << "num - " << test2 << " delitel - "<< res2 << endl;
+}
+
+//дискретный логарифм
+struct LogRes {
+    bool found = false;//найден ли логарифм
+    BN x; // решение g^x ≡ a (mod p)
+    BN h; // корень из n + 1
+    BN b; // b = g^h mod p - вычисление большого шага
+};
+
+//првоерка что g - образующий Zp 
+// Критерий: g^(p-1) = 1 и для каждого простого q | (p-1) верно
+// g^((p-1)/q) != 1 (mod p).
+// Если g не образующий, дискретный логарифм определён не для всех a.
+bool Generator(const BN& g, const BN& p)
+{
+    BN one = Uint64MakeBN(1);
+    BN zero = Uint64MakeBN(0);
+
+    //g должно лежать в 1 до p-1
+    if(g == zero || g >= p) { return false; }
+
+    BN g_copy = g;
+    BN p_copy = p;
+    BN n = p_copy - one;//порядок группы Zp
+
+    //обязательное условие что g^(p-1) = 1 
+    if(g_copy.powmod(n, p) != one) { return false; }
+
+    //расскладываем n-1 на множители с помощью функции 
+    set<BN> primes = n.factorize();
+    
+    //проверяем для каждого простого q что равно 1
+    for(const BN& q : primes)
+    {
+        if(g_copy.powmod(n / q, p) == one) { return false; }
+
+    }
+
+    return true;
+}
+
+// Основная функция: метод Гельфонда (baby-step giant-step)
+// Вход: p (простое), g (образующий), a (элемент Z*_p)
+// Выход: структура LogRes с полями found, x, h, b
+LogRes gelfond(const BN& p, const BN& g, const BN& a, bool showTable = true)
+{
+    //проверяем входные данные
+    LogRes res;
+    res.h = Uint64MakeBN(0);
+    res.b = Uint64MakeBN(0);
+    res.x = Uint64MakeBN(0);
+
+    BN zero = Uint64MakeBN(0);
+    BN one = Uint64MakeBN(1);
+    BN two = Uint64MakeBN(2);
+
+    BN t = Uint64MakeBN(10);
+    BN p_copy = p;
+    if(!p_copy.MilRabTest(t)) 
+    {
+        cout << "P - должно быть простым" << endl;
+        return res;
+    }
+
+    BN g_copy = g;
+    if(g_copy == zero || g_copy >= p_copy)
+    {
+        cout << "g находится вне [1, p - 1]" << endl;
+        return res;
+    }
+
+    BN a_copy = a;
+    if(a_copy == zero || a_copy >= p_copy)
+    {
+        cout << "a находится вне [1, p - 1]" << endl;
+        return res;
+    }
+
+    //проверяем что g это образующий группы если нет то выход
+    if(!Generator(g_copy, p_copy))
+    {
+        cout << "g не образующий Zp^" << endl;
+        return res;
+    }
+
+    //шаг 1 - порядок группы и h
+
+    BN n = p_copy - one;//p - 1
+    BN h = newtonRoot(n, 2);//корень второй степени из n 
+
+    //корректируем h до нижней границы 
+    //и там уже либо увеличиваем либо уменьшаем h
+    while((h + one).qsqr() <= n) { h += one; }
+    while(h.qsqr() > n) { h -= one; }
+
+    //после корректировки увеличиваем на 1 чтобы гарантировать что h^2 > n
+    h += one;
+
+    //шаг 2 - b = g^h mod p
+    BN b = g_copy.powmod(h, p_copy);
+
+    //шаг 3 - вычисление больших шагов 
+    //будем хранить список u для каждого значения b^u
+    //BN - ключ - значение b^u mod p
+    //vector<BN> - список всех u при которых у нас это значение 
+    map<BN, vector<BN>> giant;
+
+    BN current = one;
+    for(BN u = one; u <= h; u += one)
+    {
+        current = (current * b) % p;// current = b^u
+        giant[current].push_back(u);//запоминаем u для b^u
+    }
+
+    res.h = h;//большой шаг
+    res.b = b;//вычисление шага 
+
+    //тут вычисляем малые шаги 
+    current = one;
+    for(BN v = one; v <= h; v += one)
+    {
+        current = (current * g_copy) % p_copy;//current = g^v
+        BN small = (a_copy * current) % p_copy;//small = a * g^v
+
+        //ищем ключ который равен малому шагу 
+        //тут идёт бинарный поиск
+        auto it = giant.find(small);
+        //сюда попадаем если нашли ключ и он не последний элемент
+        if(it != giant.end())
+        {
+            // Нашли совпадение b^u = a*g^v. Может быть несколько u
+            for(BN& u : it->second)
+            {
+                // x = (h*u - v) mod n по алгоритму 
+                BN hu = ((h % n) * (u % n)) % n;
+                BN x = (hu + n - (v % n)) % n;
+
+                //обязательная проверка g^x mod p должно совпасть с а 
+                //условие b^u = a * g^v
+                if(g_copy.powmod(x, p) == a)
+                {
+                    res.found = true;
+                    res.x = x;
+                    return res;
+                }
+            }
+        }
+    }
+
+    return res;
+}
+
+//тут просто вывод - обертка функции    
+struct enterData 
+{
+    BN p;
+    BN g;
+    BN a;
+    BN expect;
+    string description;
+};
+
+vector<enterData> getData()
+{
+    vector<enterData> data;
+    
+    // Лямбда-функция для удобного добавления
+    auto add = [&](QBASE p_val, QBASE g_val, QBASE a_val, QBASE exp_val, const string& desc) {
+        data.push_back({
+            Uint64MakeBN(p_val), Uint64MakeBN(g_val),
+            Uint64MakeBN(a_val), Uint64MakeBN(exp_val), desc
+        });
+    };
+
+    add(599,   22,   418, 185,  "Задание 1: log_22(418) в Z*_599");
+    add(599,   22,   183, 321,  "Задание 1: log_22(183) в Z*_599");
+    add(599,   70,   21,  221,  "Задание 2: log_70(21) в Z*_599");
+    add(599,   70,   269, 436,  "Задание 2: log_70(269) в Z*_599");
+    add(1571,  52,   647, 368,  "Задание 3: log_52(647) в Z*_1571");
+    add(1571,  52,   190, 1023, "Задание 3: log_52(190) в Z*_1571");
+    add(1571,  1003, 912, 146,  "Задание 4: log_1003(912) в Z*_1571");
+    add(1571,  1003, 25,  86,   "Задание 4: log_1003(25) в Z*_1571");
+    add(10069, 77,   625, 156,  "Задание 5: log_77(625) в Z*_10069");
+    add(10069, 77,   7128,835,  "Задание 5: log_77(7128) в Z*_10069");
+    add(10069, 8900, 9458,1024, "Задание 6: log_8900(9458) в Z*_10069");
+    add(10069, 8900, 7330,2356, "Задание 6: log_8900(7330) в Z*_10069");
+    //add(10069, 8900, 7330,2356, "Задание 6: log_8900(7330) в Z*_10069"); для тестов 
+
+    return data;
+}
+
+void solveTask(const enterData& t, bool showTables) {
+    cout << "\n--------------------------------------------------\n";
+    cout << t.description << "\n";
+    cout << "  p = " << t.p << "\n";
+    cout << "  g = " << t.g << "\n";
+    cout << "  a = " << t.a << "\n";
+
+    LogRes res = gelfond(t.p, t.g, t.a, showTables);
+
+    if (!res.found) {
+        cout << "  Решение не найдено.\n";
+        return;
+    }
+
+    cout << "  Найдено x = " << res.x << "\n";
+    cout << "  h = " << res.h << ", b = " << res.b << "\n";
+    cout << "  Ожидалось: " << t.expect << " -> "
+         << (res.x == t.expect ? "OK" : "НЕ СОВПАЛО") << "\n";
+}
+
+// Прогон всех задач
+void runAllTasks(bool showTables) {
+    auto tasks = getData();
+    int ok = 0;
+    for (size_t i = 0; i < tasks.size(); ++i) {
+        solveTask(tasks[i], showTables);
+        LogRes res = gelfond(tasks[i].p, tasks[i].g, tasks[i].a, false);
+        if (res.found && res.x == tasks[i].expect) ok++;
+    }
+    cout << "\n==================================================\n";
+    cout << "Итог: " << ok << " из " << tasks.size() << " задач решены верно.\n";
+}
+
+// Меню
+void fifth_gelfond() {
+    auto tasks = getData();
+
+    while (true) {
+        cout << "\n==============================================\n";
+        cout << "       ЛАБОРАТОРНАЯ: МЕТОД ГЕЛЬФОНДА\n";
+        cout << "==============================================\n";
+        cout << "1. Выполнить все 12 примеров\n";
+        cout << "0. Выход\n";
+
+        int choice;
+        if (!(cin >> choice)) break;
+
+        if (choice == 0) {
+            cout << "Завершение.\n";
+            break;
+        }
+        if (choice == 1) {
+            runAllTasks(false);
+        }
+    }
+}
 
 int main()
 {
@@ -625,9 +866,9 @@ int main()
 
     //fourth_lab_P0();
 
-    BN num_test;
-    num_test = Uint64MakeBN(533);
-    cout << method_P1_polard(num_test) << endl;
+    //fourth_lab_P1();
+
+    fifth_gelfond();
     
     return 0;
 }
