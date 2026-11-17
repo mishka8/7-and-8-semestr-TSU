@@ -1272,29 +1272,37 @@ BN BN::gcd(const BN& n) const
 BN BN::log(BN base) const
 {
     BN zero; zero.decIn("0");
-    BN one; one.decIn("1");
+    BN one;  one.decIn("1");
 
     BN x = *this;
-    if(x <= one) { cout << "error log" << endl; return zero;}
-    if(base <= one) { cout << "error log" << endl; return zero;}
-    if(x < base) { cout << "error log" << endl; return zero;}
 
-    QBASE low = 1;
-    QBASE high = (QBASE)x.length() * BASE_SIZE;
-
-    while(low < high)
-    {
-        QBASE mid = low + (high - low + 1) / 2;
-        BN midBN; midBN.decIn(to_string(mid));
-        BN pw = base ^ mid;
-
-        if(pw <= x)
-            low = mid;
-        else
-            high = mid - 1;
-
+    // Проверка области определения: x >= 1, base > 1
+    if (x < one || base <= one) {
+        cout << "error log" << endl;
+        return zero;
     }
-    BN res; res.decIn(to_string(low));
 
-    return res;
+    // Верхняя граница: length() * BASE_SIZE заведомо больше log_base(x)
+    QBASE left = 0;
+    QBASE right = (QBASE)x.length() * BASE_SIZE;
+
+    while (left < right) {
+        QBASE middle = left + (right - left + 1) / 2;
+
+        // Преобразуем middle в BN, так как operator^ принимает BN
+        BN midBN;
+        midBN.decIn(std::to_string(middle));
+
+        BN p = base ^ midBN;   // base^middle
+
+        if (p <= x) {
+            left = middle;
+        } else {
+            right = middle - 1;
+        }
+    }
+
+    BN result;
+    result.decIn(std::to_string(left));
+    return result;
 }
