@@ -1,23 +1,20 @@
 ;задана целочисленная квадратная матрица n-го порядка.
 ;определить, является ли она симметричной относительно главной диагонали.
 
-;размер матрицы задаем константой MATRIX_N
-;числа вводим одной строкой через пробел, например 1 2 3 4 5 6 7 8 9
-;сначала сохраняем числа в массив, потом выводим их как матрицу
-;элемент a[i][j] находится по индексу i * MATRIX_N + j
+;сначала вводим n с клавиатуры и нажимаем Enter
+;затем вводим n строк, в каждой по n целых чисел
 ;для симметричности должно выполняться a[i][j] = a[j][i]
-;переполнение при вычислениях проверяем через флаг OF и переход jo
-;dword - 4 байта
+;переполнение при чтении чисел проверяем через флаг OF и переход jo
+;MAX_N - максимально допустимый размер матрицы
 
 section .text
     global _start
 
 _start:
-    xor edi, edi;текущее число
-    xor esi, esi;количество введенных элементов
+    xor edi, edi;вводимое значение n
 
-    ReadNum:
-        ;читаем строку по одному символу
+    ReadN:
+        ;читаем размер матрицы по одному символу
         mov eax, 3
         xor ebx, ebx
         mov edx, 1
@@ -25,19 +22,73 @@ _start:
         int 0x80
 
         cmp eax, 0
+        jle Error
+
+        cmp byte [symbol], 10
+        je EndN;Enter завершает ввод n
+
+        cmp byte [symbol], 13
+        je ReadN;пропускаем возврат каретки
+
+        ;размер матрицы должен состоять только из цифр
+        cmp byte [symbol], '0'
+        jb Error
+        cmp byte [symbol], '9'
+        ja Error
+
+        movzx eax, byte [symbol]
+        sub eax, '0'
+
+        ;собираем n: edi = edi * 10 + цифра
+        imul edi, edi, 10
+        jo Error
+        add edi, eax
+        jo Error
+
+        cmp edi, MAX_N
+        ja Error
+        jmp ReadN
+
+    EndN:
+        ;размер должен быть больше нуля и не больше MAX_N
+        cmp edi, 1
+        jb Error
+        cmp edi, MAX_N
+        ja Error
+
+        mov [matrixN], edi;сохраняем введенный размер n
+        mov eax, edi
+        imul eax, edi;вычисляем n*n
+        jo Error
+        mov [matrixSize], eax
+
+        xor edi, edi;текущее число матрицы
+        xor esi, esi;количество записанных элементов
+        xor ebp, ebp;количество элементов в текущей строке
+
+    ReadNum:
+        ;читаем число матрицы по одному символу
+        mov eax, 3
+        xor ebx, ebx
+        mov edx, 1
+        mov ecx, symbol
+        int 0x80
+
+        cmp eax, 0
+        jl Error
         jz LastNum
 
         cmp byte [symbol], 10
-        jz LastNum
+        je NewLine;Enter завершает строку матрицы
 
         cmp byte [symbol], 13
-        jz LastNum
+        je ReadNum;пропускаем возврат каретки
 
         cmp byte [symbol], ' '
-        jz SpaceChar
+        je SpaceChar
 
         cmp byte [symbol], 9
-        jz SpaceChar
+        je SpaceChar
 
         cmp byte [symbol], '-'
         jne CheckNum
@@ -58,167 +109,118 @@ _start:
         ja Error
 
         movzx eax, byte [symbol]
-        sub eax, '0';переводим символ в цифру от 0 до 9
+        sub eax, '0'
 
         ;собираем число отрицательным: edi = edi * 10 - цифра
-        ;так можно прочитать и минимальное число -2147483648
         imul edi, edi, 10
-        jo Error;OF = 1, если умножение вызвало переполнение
+        jo Error
         sub edi, eax
-        jo Error;OF = 1, если вычитание вызвало переполнение
+        jo Error
 
         mov byte [hasDigit], 1
         jmp ReadNum
 
     SpaceChar:
-        ;пробел означает конец числа
+        ;пробел заканчивает только число, но не строку матрицы
         cmp byte [hasDigit], 1
         je SaveNum
-        ;один минус без цифр не является числом
         cmp byte [negative], 1
         je Error
         jmp ReadNum
 
-    LastNum:
-        ;сохраняем последнее число, если строка закончилась
+    NewLine:
+        ;Enter означает конец строки матрицы
         cmp byte [hasDigit], 1
-        je SaveLastNum
-        cmp byte [negative], 1
-        je Error
-        jmp EndArr
+        jne CheckRow
+        mov byte [endRow], 1
+        jmp SaveNum
 
-    SaveLastNum:
-        mov byte [finished], 1
+    LastNum:
+        ;если ввод закончился без Enter
+        cmp byte [hasDigit], 1
+        jne CheckRow
+        mov byte [endRow], 1
+        jmp SaveNum
 
     SaveNum:
-        ;место в матрице должно быть для каждого числа
-        cmp esi, MATRIX_SIZE
+        ;проверяем количество чисел в текущей строке
+        cmp ebp, [matrixN]
         jae Error
 
-        ;число уже собрано отрицательным
-        ;если перед числом был '-', оставляем как есть
+        ;проверяем количество чисел во всей матрице
+        cmp esi, [matrixSize]
+        jae Error
+
         ;если минуса не было, меняем знак на положительный
         cmp byte [negative], 1
         je AddToMatrix
         neg edi
-        jo Error;число 2147483648 не помещается в знаковый dword
+        jo Error
 
     AddToMatrix:
-        ;записываем число в массив по порядку
+        ;сохраняем число в массив
         mov dword [matrix + esi * 4], edi
         inc esi
+        inc ebp
+
+        ;сбрасываем текущее число и флаги
         xor edi, edi
         mov byte [negative], 0
         mov byte [hasDigit], 0
 
-        cmp byte [finished], 1
-        je EndArr
+        ;если был Enter, переходим к концу строки
+        cmp byte [endRow], 1
+        je EndRow
         jmp ReadNum
 
-    EndArr:
-        ;в матрице n*n элементов, поэтому чисел должно быть ровно столько
-        cmp esi, MATRIX_SIZE
+    CheckRow:
+        ;минус без цифр является ошибкой
+        cmp byte [negative], 1
+        je Error
+
+    EndRow:
+        ;в строке должно быть ровно n чисел
+        cmp ebp, [matrixN]
         jne Error
 
-        mov eax, 4
-        mov ebx, 1
-        mov ecx, matrixMsg
-        mov edx, matrixMsgLen
-        int 0x80
+        ;сбрасываем количество элементов строки
+        xor ebp, ebp
+        mov byte [endRow], 0
 
-        xor esi, esi;индекс элемента матрицы
+        ;если вся матрица заполнена, переходим в Main
+        cmp esi, [matrixSize]
+        je Main
 
-    PrintMatrix:
-        ;выводим числа строками по MATRIX_N элементов
-        cmp esi, MATRIX_SIZE
-        jae Main
-
-        mov eax, [matrix + esi * 4]
-        test eax, eax
-        jns PrintAbs
-
-        ;для отрицательного числа сначала выводим минус
-        mov ebp, eax
-        mov eax, 4
-        mov ebx, 1
-        mov ecx, minus
-        mov edx, 1
-        int 0x80
-        mov eax, ebp
-        ;для -2147483648 получится 80000000h
-        ;ниже используется беззнаковое деление div, поэтому это допустимо
-        neg eax
-
-    PrintAbs:
-        ;преобразуем число в строку, записываем цифры справа налево
-        mov ecx, buffer + BUFFER_SIZE
-        mov ebx, 10
-
-    DivLoop:
-        xor edx, edx
-        div ebx
-        add dl, '0'
-        dec ecx
-        mov [ecx], dl
-        test eax, eax
-        jnz DivLoop
-
-        mov edx, buffer + BUFFER_SIZE
-        sub edx, ecx
-        mov eax, 4
-        mov ebx, 1
-        int 0x80
-
-        ;после каждого n-го элемента переходим на новую строку
-        inc esi
-        mov eax, esi
-        xor edx, edx
-        mov ebx, MATRIX_N
-        div ebx
-        test edx, edx
-        jz PrintNewLine
-
-        mov eax, 4
-        mov ebx, 1
-        mov ecx, Space
-        mov edx, 1
-        int 0x80
-        jmp PrintMatrix
-
-    PrintNewLine:
-        mov eax, 4
-        mov ebx, 1
-        mov ecx, newline
-        mov edx, 1
-        int 0x80
-        jmp PrintMatrix
+        ;иначе читаем следующую строку
+        jmp ReadNum
 
     Main:
         ;сравниваем a[i][j] и a[j][i]
-        ;главную диагональ проверять не нужно, поэтому j = i + 1
+        ;главную диагональ проверять не нужно
         xor esi, esi;номер строки i
 
     RowLoop:
-        cmp esi, MATRIX_N
+        cmp esi, [matrixN]
         jae Symmetric
         mov edi, esi
-        inc edi;номер столбца j
+        inc edi;номер столбца j = i + 1
 
     ColLoop:
-        cmp edi, MATRIX_N
+        cmp edi, [matrixN]
         jae NextRow
 
         ;получаем a[i][j], индекс i*n+j
         mov eax, esi
-        imul eax, eax, MATRIX_N
+        imul eax, dword [matrixN]
         add eax, edi
         mov ebx, [matrix + eax * 4]
 
         ;получаем a[j][i], индекс j*n+i
         mov eax, edi
-        imul eax, eax, MATRIX_N
+        imul eax, dword [matrixN]
         add eax, esi
 
+        ;сравниваем два элемента
         cmp ebx, [matrix + eax * 4]
         jne NotSymmetric
 
@@ -230,7 +232,7 @@ _start:
         jmp RowLoop
 
     Symmetric:
-        ;если все пары совпадают, матрица симметрична
+        ;если все пары совпадают
         mov eax, 4
         mov ebx, 1
         mov ecx, yesMsg
@@ -239,7 +241,7 @@ _start:
         jmp Exit
 
     NotSymmetric:
-        ;нашли пару элементов, которые не совпадают
+        ;если хотя бы одна пара не совпадает
         mov eax, 4
         mov ebx, 1
         mov ecx, noMsg
@@ -248,7 +250,7 @@ _start:
         jmp Exit
 
     Error:
-        ;неверное количество чисел или некорректный ввод
+        ;неверный размер, количество чисел или некорректный ввод
         mov eax, 4
         mov ebx, 1
         mov ecx, errorMsg
@@ -262,21 +264,13 @@ _start:
         int 0x80
 
 section .data
-    MATRIX_N equ 3
-    MATRIX_SIZE equ MATRIX_N * MATRIX_N
-    BUFFER_SIZE equ 12
+    MAX_N equ 32
+    MAX_SIZE equ MAX_N * MAX_N
 
     symbol db 0
     negative db 0
     hasDigit db 0
-    finished db 0
-
-    minus db '-'
-    Space db ' '
-    newline db 10
-
-    matrixMsg db 'matrix:', 10
-    matrixMsgLen equ $ - matrixMsg
+    endRow db 0
 
     yesMsg db 'symmetric', 10
     yesMsgLen equ $ - yesMsg
@@ -288,5 +282,6 @@ section .data
     errorLen equ $ - errorMsg
 
 section .bss
-    buffer resb BUFFER_SIZE
-    matrix resd MATRIX_SIZE
+    matrixN resd 1
+    matrixSize resd 1
+    matrix resd MAX_SIZE
