@@ -856,6 +856,158 @@ void fifth_gelfond() {
     }
 }
 
+struct PollardRhoResult
+{
+    bool found;
+    BN x;
+};
+
+// Обратный элемент для взаимно простых value и modulus.
+static BN pollardRhoInverse(BN value, BN modulus)
+{
+    BN zero = Uint64MakeBN(0);
+    BN remainder = modulus;
+    BN coefficient = zero;
+    BN nextCoefficient = Uint64MakeBN(1);
+
+    // Расширенный алгоритм Евклида с коэффициентами по модулю modulus.
+    while (value != zero)
+    {
+        BN quotient = remainder / value;
+        BN nextRemainder = remainder % value;
+        BN product = (quotient * nextCoefficient) % modulus;
+        BN updatedCoefficient = (coefficient + modulus - product) % modulus;
+        remainder = value;
+        value = nextRemainder;
+        coefficient = nextCoefficient;
+        nextCoefficient = updatedCoefficient;
+    }
+
+    return coefficient;
+}
+
+// ρ-метод Полларда для g^x = a (mod p).
+// Условия задачи: p простое, g порождает группу Z*_p.
+PollardRhoResult pollardRho(const BN& p, BN g, BN a)
+{
+    const BN zero = Uint64MakeBN(0);
+    const BN one = Uint64MakeBN(1);
+    const BN two = Uint64MakeBN(2);
+    const PollardRhoResult failure{false, zero};
+
+    if (p <= one || g < one || g >= p || a < one || a >= p)
+        return failure;
+    if (a == one)
+        return {true, zero};
+    if (a == g)
+        return {true, one};
+
+    BN order = p;
+    order -= one;
+    const BN maxExponent = order - one;
+
+    // На каждом шаге сохраняется x = g^u * a^v (mod p).
+    struct State
+    {
+        BN x;
+        BN u;
+        BN v;
+    };
+
+    const auto step = [&](State& state)
+    {
+        BN group = state.x % static_cast<BASE>(3);
+        if (group == one)
+        {
+            state.x = (state.x * a) % p;
+            state.v = (state.v + one) % order;
+        }
+        else if (group == two)
+        {
+            state.x = state.x.qsqr() % p;
+            state.u = (state.u + state.u) % order;
+            state.v = (state.v + state.v) % order;
+        }
+        else
+        {
+            state.x = (state.x * g) % p;
+            state.u = (state.u + one) % order;
+        }
+    };
+
+    constexpr int maxAttempts = 16;
+    for (int attempt = 0; attempt < maxAttempts; ++attempt)
+    {
+        State slow{one, zero, zero};
+        if (attempt > 0)
+        {
+            slow.u.randomizeRange(zero, maxExponent);
+            slow.v.randomizeRange(zero, maxExponent);
+            slow.x = (g.powmod(slow.u, p) * a.powmod(slow.v, p)) % p;
+        }
+
+        State fast = slow;
+        do
+        {
+            step(slow);
+            step(fast);
+            step(fast);
+        } while (slow.x != fast.x);
+
+        // После совпадения решаем r * x = b (mod order).
+        BN r = (slow.v + order - fast.v) % order;
+        if (r == zero)
+            continue;
+
+        BN b = (fast.u + order - slow.u) % order;
+        BN d = r.gcd(order);
+        if (b % d != zero)
+            continue;
+
+        BN spacing = order / d;
+        BN inverse = pollardRhoInverse(r / d, spacing);
+        BN candidate = ((b / d) * inverse) % spacing;
+
+        // Кандидаты имеют вид x0 + k * spacing, 0 <= k < d.
+        BN power = g.powmod(candidate, p);
+        BN multiplier = g.powmod(spacing, p);
+        for (BN k = zero; k < d; k += one)
+        {
+            if (power == a)
+                return {true, candidate};
+            candidate += spacing;
+            power = (power * multiplier) % p;
+        }
+    }
+
+    return failure;
+}
+
+void sixth_lab_PollardRho()
+{
+    const auto tasks = getData();
+    size_t passed = 0;
+
+    for (const enterData& task : tasks)
+    {
+        const PollardRhoResult result = pollardRho(task.p, task.g, task.a);
+        cout << task.description << " | ожидается x = " << task.expect;
+
+        if (!result.found)
+        {
+            cout << " | решение не найдено\n";
+            continue;
+        }
+
+        const bool matches = result.x == task.expect;
+        cout << " | получено x = " << result.x << (matches ? " | OK\n" : " | ОШИБКА\n");
+        if (matches)
+            ++passed;
+    }
+
+    cout << "Итог: " << passed << " из " << tasks.size() << " тестов пройдено.\n";
+}
+
 int main()
 {
     //first_lab();
@@ -868,7 +1020,9 @@ int main()
 
     //fourth_lab_P1();
 
-    fifth_gelfond();
+    //fifth_gelfond();
+
+    sixth_lab_PollardRho();
     
     return 0;
 }
