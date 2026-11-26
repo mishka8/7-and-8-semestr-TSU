@@ -799,7 +799,8 @@ vector<enterData> getData()
     return data;
 }
 
-void solveTask(const enterData& t, bool showTables) {
+void solveTask(const enterData& t, bool showTables) 
+{
     cout << "\n--------------------------------------------------\n";
     cout << t.description << "\n";
     cout << "  p = " << t.p << "\n";
@@ -808,7 +809,8 @@ void solveTask(const enterData& t, bool showTables) {
 
     LogRes res = gelfond(t.p, t.g, t.a, showTables);
 
-    if (!res.found) {
+    if (!res.found) 
+    {
         cout << "  Решение не найдено.\n";
         return;
     }
@@ -833,10 +835,12 @@ void runAllTasks(bool showTables) {
 }
 
 // Меню
-void fifth_gelfond() {
+void fifth_gelfond() 
+{
     auto tasks = getData();
 
-    while (true) {
+    while (true) 
+    {
         cout << "\n==============================================\n";
         cout << "       ЛАБОРАТОРНАЯ: МЕТОД ГЕЛЬФОНДА\n";
         cout << "==============================================\n";
@@ -846,151 +850,185 @@ void fifth_gelfond() {
         int choice;
         if (!(cin >> choice)) break;
 
-        if (choice == 0) {
+        if (choice == 0) 
+        {
             cout << "Завершение.\n";
             break;
         }
-        if (choice == 1) {
+        if (choice == 1) 
+        {
             runAllTasks(false);
         }
     }
 }
 
-struct PollardRhoResult
+struct pPolRes
 {
     bool found;
     BN x;
 };
 
-// Обратный элемент для взаимно простых value и modulus.
-static BN pollardRhoInverse(BN value, BN modulus)
+// Разность остатков, уже приведённых по модулю n.
+BN pPollardModSub(const BN& left, const BN& right, const BN& n)
+{
+    BN n_copy = n;
+    BN left_copy = left;
+    BN right_copy = right;
+    return (left_copy + n_copy - right_copy) % n_copy;
+}
+
+// Шаг F из лекции. Здесь x = g^u * a^v (mod p).
+void pPollardStep(BN& x, BN& u, BN& v, const BN& p, const BN& g, const BN& a, const BN& n)
+{
+    BN one = Uint64MakeBN(1);
+    BN two = Uint64MakeBN(2);
+    BN remainder = x % static_cast<BASE>(3);
+    //формулы из лекции 1 2 3
+    // S1. Умножили x на a, значит добавили одну степень a.
+    if(remainder == one)
+    {
+        x = (x * a) % p;
+        v = (v + one) % n;
+    }
+    // S2. (g^u * a^v)^2 = g^(2*u) * a^(2*v).
+    else if(remainder == two)
+    {
+        x = x.qsqr() % p;
+        u = (u + u) % n;
+        v = (v + v) % n;
+    }
+    // S3. Умножили x на g, значит добавили одну степень g.
+    else
+    {
+        x = (x * g) % p;
+        u = (u + one) % n;
+    }
+}
+
+// Поиск совпадающих элементов методом Флойда.
+void pPollardFind(BN x, BN u, BN v, const BN& p, const BN& g, const BN& a, const BN& n,
+                                       BN& r, BN& right_side)
+{
+    BN x_fast = x;
+    BN u_fast = u;
+    BN v_fast = v;
+
+    do
+    {
+        pPollardStep(x, u, v, p, g, a, n);
+        pPollardStep(x_fast, u_fast, v_fast, p, g, a, n);
+        pPollardStep(x_fast, u_fast, v_fast, p, g, a, n);
+    } while(x != x_fast);
+
+    // После коллизии r * z = right_side (mod n).
+    r = pPollardModSub(v, v_fast, n);
+    right_side = pPollardModSub(u_fast, u, n);
+}
+
+// Обратный элемент через расширенный алгоритм Евклида.
+BN pPollardInverse(BN value, const BN& modulus)
 {
     BN zero = Uint64MakeBN(0);
     BN remainder = modulus;
     BN coefficient = zero;
-    BN nextCoefficient = Uint64MakeBN(1);
+    BN next_coefficient = Uint64MakeBN(1);
 
-    // Расширенный алгоритм Евклида с коэффициентами по модулю modulus.
-    while (value != zero)
+    while(value != zero)
     {
         BN quotient = remainder / value;
-        BN nextRemainder = remainder % value;
-        BN product = (quotient * nextCoefficient) % modulus;
-        BN updatedCoefficient = (coefficient + modulus - product) % modulus;
+        BN next_remainder = remainder % value;
+        BN product = (quotient * next_coefficient) % modulus;
+        BN updated_coefficient = pPollardModSub(coefficient, product, modulus);
+
         remainder = value;
-        value = nextRemainder;
-        coefficient = nextCoefficient;
-        nextCoefficient = updatedCoefficient;
+        value = next_remainder;
+        coefficient = next_coefficient;
+        next_coefficient = updated_coefficient;
     }
 
     return coefficient;
 }
 
-// ρ-метод Полларда для g^x = a (mod p).
-// Условия задачи: p простое, g порождает группу Z*_p.
-PollardRhoResult pollardRho(const BN& p, BN g, BN a)
+// Решаем сравнение и проверяем d кандидатов с шагом n / d.
+pPolRes pPollardSolve(const BN& p, BN g, const BN& a,
+                                         const BN& n, BN r, const BN& right_side)
 {
-    const BN zero = Uint64MakeBN(0);
-    const BN one = Uint64MakeBN(1);
-    const BN two = Uint64MakeBN(2);
-    const PollardRhoResult failure{false, zero};
+    BN zero = Uint64MakeBN(0);
+    BN one = Uint64MakeBN(1);
 
-    if (p <= one || g < one || g >= p || a < one || a >= p)
-        return failure;
-    if (a == one)
-        return {true, zero};
-    if (a == g)
-        return {true, one};
+    if(r == zero) { return {false, zero}; }
 
-    BN order = p;
-    order -= one;
-    const BN maxExponent = order - one;
+    BN n_copy = n;
+    BN d = r.gcd(n);
+    BN right_side_copy = right_side;
+    if(right_side_copy % d != zero) { return {false, zero}; }
 
-    // На каждом шаге сохраняется x = g^u * a^v (mod p).
-    struct State
+    
+    BN step = n_copy / d;
+    BN inverse = pPollardInverse(r / d, step);
+    BN candidate = ((right_side_copy / d) * inverse) % step;
+
+    BN power = g.powmod(candidate, p);
+    BN multiplier = g.powmod(step, p);
+    for(BN k = zero; k < d; k += one)
     {
-        BN x;
-        BN u;
-        BN v;
-    };
+        if(power == a)
+            return {true, candidate};
 
-    const auto step = [&](State& state)
-    {
-        BN group = state.x % static_cast<BASE>(3);
-        if (group == one)
-        {
-            state.x = (state.x * a) % p;
-            state.v = (state.v + one) % order;
-        }
-        else if (group == two)
-        {
-            state.x = state.x.qsqr() % p;
-            state.u = (state.u + state.u) % order;
-            state.v = (state.v + state.v) % order;
-        }
-        else
-        {
-            state.x = (state.x * g) % p;
-            state.u = (state.u + one) % order;
-        }
-    };
-
-    constexpr int maxAttempts = 16;
-    for (int attempt = 0; attempt < maxAttempts; ++attempt)
-    {
-        State slow{one, zero, zero};
-        if (attempt > 0)
-        {
-            slow.u.randomizeRange(zero, maxExponent);
-            slow.v.randomizeRange(zero, maxExponent);
-            slow.x = (g.powmod(slow.u, p) * a.powmod(slow.v, p)) % p;
-        }
-
-        State fast = slow;
-        do
-        {
-            step(slow);
-            step(fast);
-            step(fast);
-        } while (slow.x != fast.x);
-
-        // После совпадения решаем r * x = b (mod order).
-        BN r = (slow.v + order - fast.v) % order;
-        if (r == zero)
-            continue;
-
-        BN b = (fast.u + order - slow.u) % order;
-        BN d = r.gcd(order);
-        if (b % d != zero)
-            continue;
-
-        BN spacing = order / d;
-        BN inverse = pollardRhoInverse(r / d, spacing);
-        BN candidate = ((b / d) * inverse) % spacing;
-
-        // Кандидаты имеют вид x0 + k * spacing, 0 <= k < d.
-        BN power = g.powmod(candidate, p);
-        BN multiplier = g.powmod(spacing, p);
-        for (BN k = zero; k < d; k += one)
-        {
-            if (power == a)
-                return {true, candidate};
-            candidate += spacing;
-            power = (power * multiplier) % p;
-        }
+        candidate += step;
+        power = (power * multiplier) % p;
     }
 
-    return failure;
+    return {false, zero};
 }
 
-void sixth_lab_PollardRho()
+// p простое, g — образующий группы Z*_p.
+pPolRes pPollard(const BN& p, BN g, BN a)
+{
+    BN zero = Uint64MakeBN(0);
+    BN one = Uint64MakeBN(1);
+
+    if(p <= one || g < one || g >= p || a < one || a >= p)
+        return {false, zero};
+    if(a == one)
+        return {true, zero};
+    if(a == g)
+        return {true, one};
+    
+    BN p_copy = p;
+    BN n = p_copy - one;
+    BN max_exponent = n - one;
+    const int max_attempts = 16;//так как метод вероятностный 
+
+    for(int attempt = 0; attempt < max_attempts; ++attempt)
+    {
+        BN x = one, u = zero, v = zero;
+        if(attempt > 0)
+        {
+            u.randomizeRange(zero, max_exponent);//есть функция которая выбирает рандомные значения в промежутке
+            v.randomizeRange(zero, max_exponent);
+            x = (g.powmod(u, p) * a.powmod(v, p)) % p;
+        }
+
+        BN r, right_side;
+        pPollardFind(x, u, v, p, g, a, n, r, right_side);
+
+        pPolRes res = pPollardSolve(p, g, a, n, r, right_side);
+        if(res.found)
+            return res;
+    }
+
+    return {false, zero};
+}
+
+void pPollardSixth()
 {
     const auto tasks = getData();
     size_t passed = 0;
 
     for (const enterData& task : tasks)
     {
-        const PollardRhoResult result = pollardRho(task.p, task.g, task.a);
+        const pPolRes result = pPollard(task.p, task.g, task.a);
         cout << task.description << " | ожидается x = " << task.expect;
 
         if (!result.found)
@@ -1022,7 +1060,7 @@ int main()
 
     //fifth_gelfond();
 
-    sixth_lab_PollardRho();
+    pPollardSixth();
     
     return 0;
 }
