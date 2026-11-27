@@ -862,36 +862,38 @@ void fifth_gelfond()
     }
 }
 
+
+//решает проблему поиска дискретного логарифма
+//метод вероятностный типа лас вегас
+//такая же сложность как у Гельфонда но ллучше по памяти
+//строим псевддослучайную последовательность для факторизации числа
+//ищем сомпадающие элементы с помощью метода флойда
+//и находим дискретный логарифм 
+
+//разбиваем на множества
+
 struct pPolRes
 {
     bool found;
-    BN x;
+    BN z;
 };
 
-// Разность остатков, уже приведённых по модулю n.
-BN pPollardModSub(const BN& left, const BN& right, const BN& n)
-{
-    BN n_copy = n;
-    BN left_copy = left;
-    BN right_copy = right;
-    return (left_copy + n_copy - right_copy) % n_copy;
-}
-
 // Шаг F из лекции. Здесь x = g^u * a^v (mod p).
+//реализация шагов в функции
 void pPollardStep(BN& x, BN& u, BN& v, const BN& p, const BN& g, const BN& a, const BN& n)
 {
     BN one = Uint64MakeBN(1);
     BN two = Uint64MakeBN(2);
-    BN remainder = x % static_cast<BASE>(3);
+    BN ost = x % static_cast<BASE>(3);
     //формулы из лекции 1 2 3
     // S1. Умножили x на a, значит добавили одну степень a.
-    if(remainder == one)
+    if(ost == one)
     {
         x = (x * a) % p;
         v = (v + one) % n;
     }
     // S2. (g^u * a^v)^2 = g^(2*u) * a^(2*v).
-    else if(remainder == two)
+    else if(ost == two)
     {
         x = x.qsqr() % p;
         u = (u + u) % n;
@@ -906,52 +908,60 @@ void pPollardStep(BN& x, BN& u, BN& v, const BN& p, const BN& g, const BN& a, co
 }
 
 // Поиск совпадающих элементов методом Флойда.
-void pPollardFind(BN x, BN u, BN v, const BN& p, const BN& g, const BN& a, const BN& n,
-                                       BN& r, BN& right_side)
+//тут реализован метод флойда
+void pPollardFind(BN x1, BN u1, BN v1, const BN& p, const BN& g, const BN& a, const BN& n, BN& r, BN& u2_minus_u1)
 {
-    BN x_fast = x;
-    BN u_fast = u;
-    BN v_fast = v;
+    BN x2 = x1;
+    BN u2 = u1;
+    BN v2 = v1;
 
     do
     {
-        pPollardStep(x, u, v, p, g, a, n);
-        pPollardStep(x_fast, u_fast, v_fast, p, g, a, n);
-        pPollardStep(x_fast, u_fast, v_fast, p, g, a, n);
-    } while(x != x_fast);
+        pPollardStep(x1, u1, v1, p, g, a, n);
+        pPollardStep(x2, u2, v2, p, g, a, n);
+        pPollardStep(x2, u2, v2, p, g, a, n);
+    } while(x1 != x2);
 
-    // После коллизии r * z = right_side (mod n).
-    r = pPollardModSub(v, v_fast, n);
-    right_side = pPollardModSub(u_fast, u, n);
+    // После коллизии r * z = u2_minus_u1 (mod n).
+    BN n_copy = n;
+    r = (v1 + n_copy - v2) % n_copy;
+    u2_minus_u1 = (u2 + n_copy - u1) % n_copy;
 }
 
 // Обратный элемент через расширенный алгоритм Евклида.
-BN pPollardInverse(BN value, const BN& modulus)
+// value и mod взаимно просты, mod > 1.
+BN pPollardInverse(BN value, const BN& mod)
 {
     BN zero = Uint64MakeBN(0);
-    BN remainder = modulus;
-    BN coefficient = zero;
-    BN next_coefficient = Uint64MakeBN(1);
+    BN one = Uint64MakeBN(1);
+    BN mod_copy = mod;
 
-    while(value != zero)
+    BN old_ost = value % mod_copy;
+    BN ost = mod_copy;
+    BN old_coef_u = one;
+    BN coef_u = zero;
+
+    // old_ost = value * old_coef_u (mod mod)
+    // ost = value * coef_u (mod mod)
+    while(ost != zero)
     {
-        BN quotient = remainder / value;
-        BN next_remainder = remainder % value;
-        BN product = (quotient * next_coefficient) % modulus;
-        BN updated_coefficient = pPollardModSub(coefficient, product, modulus);
+        BN q = old_ost / ost;
+        BN next_ost = old_ost - q * ost;
+        old_ost = ost;
+        ost = next_ost;
 
-        remainder = value;
-        value = next_remainder;
-        coefficient = next_coefficient;
-        next_coefficient = updated_coefficient;
+        BN product = (q * coef_u) % mod_copy;
+        BN next_coef_u = (old_coef_u + mod_copy - product) % mod_copy;
+        old_coef_u = coef_u;
+        coef_u = next_coef_u;
     }
 
-    return coefficient;
+    // Последний ненулевой остаток равен 1, его коэффициент обратен к value.
+    return old_coef_u % mod_copy;
 }
 
 // Решаем сравнение и проверяем d кандидатов с шагом n / d.
-pPolRes pPollardSolve(const BN& p, BN g, const BN& a,
-                                         const BN& n, BN r, const BN& right_side)
+pPolRes pPollardSolve(const BN& p, BN g, const BN& a, const BN& n, BN r, const BN& u2_minus_u1)
 {
     BN zero = Uint64MakeBN(0);
     BN one = Uint64MakeBN(1);
@@ -960,22 +970,23 @@ pPolRes pPollardSolve(const BN& p, BN g, const BN& a,
 
     BN n_copy = n;
     BN d = r.gcd(n);
-    BN right_side_copy = right_side;
-    if(right_side_copy % d != zero) { return {false, zero}; }
+    BN u2_minus_u1_copy = u2_minus_u1;
+    if(u2_minus_u1_copy % d != zero) { return {false, zero}; }
 
     
     BN step = n_copy / d;
     BN inverse = pPollardInverse(r / d, step);
-    BN candidate = ((right_side_copy / d) * inverse) % step;
+    BN z_i = ((u2_minus_u1_copy / d) * inverse) % step;
 
-    BN power = g.powmod(candidate, p);
+    BN power = g.powmod(z_i, p);
     BN multiplier = g.powmod(step, p);
-    for(BN k = zero; k < d; k += one)
+    //находим z с шагом n\d  и проверяем равно ли g^zi = a
+    for(BN i = zero; i < d; i += one)
     {
         if(power == a)
-            return {true, candidate};
+            return {true, z_i};
 
-        candidate += step;
+        z_i += step;
         power = (power * multiplier) % p;
     }
 
@@ -998,22 +1009,22 @@ pPolRes pPollard(const BN& p, BN g, BN a)
     BN p_copy = p;
     BN n = p_copy - one;
     BN max_exponent = n - one;
-    const int max_attempts = 16;//так как метод вероятностный 
+    int max_attempts = 16;//так как метод вероятностный 
 
     for(int attempt = 0; attempt < max_attempts; ++attempt)
     {
-        BN x = one, u = zero, v = zero;
+        BN x0 = one, u0 = zero, v0 = zero;
         if(attempt > 0)
         {
-            u.randomizeRange(zero, max_exponent);//есть функция которая выбирает рандомные значения в промежутке
-            v.randomizeRange(zero, max_exponent);
-            x = (g.powmod(u, p) * a.powmod(v, p)) % p;
+            u0.randomizeRange(zero, max_exponent);//есть функция которая выбирает рандомные значения в промежутке
+            v0.randomizeRange(zero, max_exponent);
+            x0 = (g.powmod(u0, p) * a.powmod(v0, p)) % p;
         }
 
-        BN r, right_side;
-        pPollardFind(x, u, v, p, g, a, n, r, right_side);
+        BN r, u2_minus_u1;
+        pPollardFind(x0, u0, v0, p, g, a, n, r, u2_minus_u1);
 
-        pPolRes res = pPollardSolve(p, g, a, n, r, right_side);
+        pPolRes res = pPollardSolve(p, g, a, n, r, u2_minus_u1);
         if(res.found)
             return res;
     }
@@ -1029,7 +1040,7 @@ void pPollardSixth()
     for (const enterData& task : tasks)
     {
         const pPolRes result = pPollard(task.p, task.g, task.a);
-        cout << task.description << " | ожидается x = " << task.expect;
+        cout << task.description << " | ожидается z = " << task.expect;
 
         if (!result.found)
         {
@@ -1037,8 +1048,8 @@ void pPollardSixth()
             continue;
         }
 
-        const bool matches = result.x == task.expect;
-        cout << " | получено x = " << result.x << (matches ? " | OK\n" : " | ОШИБКА\n");
+        const bool matches = result.z == task.expect;
+        cout << " | получено z = " << result.z << (matches ? " | OK\n" : " | ОШИБКА\n");
         if (matches)
             ++passed;
     }
